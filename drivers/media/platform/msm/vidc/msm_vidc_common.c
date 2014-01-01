@@ -72,7 +72,16 @@ static bool is_turbo_requested(struct msm_vidc_core *core,
 
 static bool is_thumbnail_session(struct msm_vidc_inst *inst)
 {
-	return !!(inst->flags & VIDC_THUMBNAIL);
+	if (inst->session_type == MSM_VIDC_DECODER) {
+		int rc = 0;
+		struct v4l2_control ctrl = {
+			.id = V4L2_CID_MPEG_VIDC_VIDEO_SYNC_FRAME_DECODE
+		};
+		rc = v4l2_g_ctrl(&inst->ctrl_handler, &ctrl);
+		if (!rc && ctrl.value)
+			return true;
+	}
+	return false;
 }
 enum multi_stream msm_comm_get_stream_output_mode(struct msm_vidc_inst *inst)
 {
@@ -527,7 +536,7 @@ static void handle_event_change(enum command_response cmd, void *data)
 		case HAL_EVENT_RELEASE_BUFFER_REFERENCE:
 			{
 				struct v4l2_event buf_event = {0};
-				struct buffer_info *binfo = NULL, *temp = NULL;
+				struct buffer_info *binfo = NULL;
 				u32 *ptr = NULL;
 
 				dprintk(VIDC_DBG,
@@ -570,14 +579,8 @@ static void handle_event_change(enum command_response cmd, void *data)
 					ptr[0], ptr[1]);
 
 				mutex_lock(&inst->sync_lock);
-
 				/* Decrement buffer reference count*/
-				list_for_each_entry(temp, &inst->registered_bufs, list) {
-					if (temp == binfo) {
-						buf_ref_put(inst, binfo);
-						break;
-					}
-				}
+				buf_ref_put(inst, binfo);
 
 				/*
 				* Release buffer and remove from list

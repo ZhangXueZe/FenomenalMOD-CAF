@@ -18,36 +18,6 @@
 #include <linux/pagevec.h>
 #include <linux/pagemap.h>
 
-unsigned long max_readahead_pages = VM_MAX_READAHEAD * 1024 / PAGE_CACHE_SIZE;
-
-static int __init readahead(char *str)
-{
-	unsigned long bytes;
-
-	if (!str)
-		return -EINVAL;
-
-	bytes = memparse(str, &str);
-
-	if (*str != '\0')
-		return -EINVAL;
-
-	if (bytes) {
-		if (bytes < PAGE_CACHE_SIZE) /* missed 'k'/'m' suffixes? */
-			return -EINVAL;
-
-		if (bytes > 256 << 20)       /* limit to 256MB */
-			bytes = 256 << 20;
-	}
-
-	max_readahead_pages = bytes / PAGE_CACHE_SIZE;
-	default_backing_dev_info.ra_pages = max_readahead_pages;
-
-	return 0;
-}
-
-early_param("readahead", readahead);
-
 /*
  * Initialise a struct file's readahead state.  Assumes that the caller has
  * memset *ra to zero.
@@ -251,7 +221,7 @@ int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 	while (nr_to_read) {
 		int err;
 
-		unsigned long this_chunk = (2097152) >> PAGE_CACHE_SHIFT;
+		unsigned long this_chunk = (2 * 1024 * 1024) / PAGE_CACHE_SIZE;
 
 		if (this_chunk > nr_to_read)
 			this_chunk = nr_to_read;
@@ -275,7 +245,7 @@ int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 unsigned long max_sane_readahead(unsigned long nr)
 {
 	return min(nr, (node_page_state(numa_node_id(), NR_INACTIVE_FILE)
-		+ node_page_state(numa_node_id(), NR_FREE_PAGES)) >> 1);
+		+ node_page_state(numa_node_id(), NR_FREE_PAGES)) / 2);
 }
 
 /*
@@ -304,10 +274,10 @@ static unsigned long get_init_ra_size(unsigned long size, unsigned long max)
 {
 	unsigned long newsize = roundup_pow_of_two(size);
 
-	if (newsize <= (max >> 5))
-		newsize = newsize << 2;
-	else if (newsize <= (max >> 2))
-		newsize = newsize << 1;
+	if (newsize <= 1)
+		newsize = newsize * 4;
+	else if (newsize <= max / 4)
+		newsize = newsize * 2;
 	else
 		newsize = max;
 
@@ -324,10 +294,10 @@ static unsigned long get_next_ra_size(struct file_ra_state *ra,
 	unsigned long cur = ra->size;
 	unsigned long newsize;
 
-	if (cur < (max >> 4))
-		newsize = cur << 2;
+	if (cur < max / 16)
+		newsize = 4 * cur;
 	else
-		newsize = cur << 1;
+		newsize = 2 * cur;
 
 	return min(newsize, max);
 }
@@ -415,7 +385,7 @@ static int try_context_readahead(struct address_space *mapping,
 	 * it is a strong indication of long-run stream (or whole-file-read)
 	 */
 	if (size >= offset)
-		size <<= 1;
+		size *= 2;
 
 	ra->start = offset;
 	ra->size = get_init_ra_size(size + req_size, max);

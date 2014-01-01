@@ -109,10 +109,17 @@ int stm401_reset_and_init(void)
 
 	pdata = stm401_misc_data->pdata;
 
+	mutex_locked = mutex_trylock(&stm401_misc_data->lock);
+	stm401_quickpeek_reset_locked(stm401_misc_data, false);
+	if (mutex_locked)
+		mutex_unlock(&stm401_misc_data->lock);
+
 	stm401_wake(stm401_misc_data);
 
 	do {
 		stm401_reset(pdata, rst_cmdbuff);
+
+		stm401_i2c_retry_delay = 200;
 
 		/* check for sign of life */
 		rst_cmdbuff[0] = REV_ID;
@@ -123,15 +130,13 @@ int stm401_reset_and_init(void)
 				reset_attempts);
 	} while (reset_attempts++ < 5 && err < 0);
 
-	stm401_i2c_retry_delay = 200;
+	stm401_i2c_retry_delay = 13;
 
 	rst_cmdbuff[0] = ACCEL_UPDATE_RATE;
 	rst_cmdbuff[1] = stm401_g_acc_delay;
 	err = stm401_i2c_write_no_reset(stm401_misc_data, rst_cmdbuff, 2);
 	if (err < 0)
 		ret_err = err;
-
-	stm401_i2c_retry_delay = 13;
 
 	rst_cmdbuff[0] = MAG_UPDATE_RATE;
 	rst_cmdbuff[1] = stm401_g_mag_delay;
@@ -274,11 +279,6 @@ int stm401_reset_and_init(void)
 	/* sending reset to slpc hal */
 	stm401_ms_data_buffer_write(stm401_misc_data, DT_RESET,
 		NULL, 0);
-
-	mutex_locked = mutex_trylock(&stm401_misc_data->lock);
-	stm401_quickpeek_reset_locked(stm401_misc_data);
-	if (mutex_locked)
-		mutex_unlock(&stm401_misc_data->lock);
 
 	kfree(rst_cmdbuff);
 	stm401_sleep(stm401_misc_data);

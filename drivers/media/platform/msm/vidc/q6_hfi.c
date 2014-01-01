@@ -140,7 +140,7 @@ err_q_write:
 	return rc;
 }
 
-int q6_hfi_iface_eventq_read(struct q6_hfi_device *device, void *pkt)
+static int q6_hfi_iface_eventq_read(struct q6_hfi_device *device, void *pkt)
 {
 	int rc = 0;
 	struct q6_iface_q_info *q_info;

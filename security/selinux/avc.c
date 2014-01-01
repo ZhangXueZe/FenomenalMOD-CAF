@@ -22,7 +22,6 @@
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/percpu.h>
-#include <linux/moduleparam.h>
 #include <net/sock.h>
 #include <linux/un.h>
 #include <net/af_unix.h>
@@ -87,9 +86,6 @@ DEFINE_PER_CPU(struct avc_cache_stats, avc_cache_stats) = { 0 };
 static struct avc_cache avc_cache;
 static struct avc_callback_node *avc_callbacks;
 static struct kmem_cache *avc_node_cachep;
-
-static bool force_audit = false;
-module_param(force_audit, bool, 0644);
 
 static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
 {
@@ -554,7 +550,6 @@ inline int avc_audit(u32 ssid, u32 tsid,
 		    a->selinux_audit_data->auditdeny &&
 		    !(a->selinux_audit_data->auditdeny & avd->auditdeny))
 			audited = 0;
-			if (force_audit) audited = 1;
 	} else if (result)
 		audited = denied = requested;
 	else

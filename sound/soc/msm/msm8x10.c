@@ -236,12 +236,11 @@ static int msm_ext_spkramp_event(struct snd_soc_dapm_widget *w,
 {
 	pr_debug("%s()\n", __func__);
 
-	if (ext_spk_amp_gpio >= 0) {
-		if (SND_SOC_DAPM_EVENT_ON(event))
-			msm8x10_enable_ext_spk_power_amp(1);
-		else
-			msm8x10_enable_ext_spk_power_amp(0);
-	}
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		msm8x10_enable_ext_spk_power_amp(1);
+	else
+		msm8x10_enable_ext_spk_power_amp(0);
+
 	return 0;
 
 }
@@ -249,24 +248,26 @@ static int msm_ext_spkramp_event(struct snd_soc_dapm_widget *w,
 static void msm8x10_enable_ext_spk_power_amp(u32 on)
 {
 	if (on) {
-		if (!IS_ERR(boost_reg)) {
+		if (!IS_ERR_OR_NULL(boost_reg)) {
 			if (regulator_enable(boost_reg))
 				pr_err("%s: enable failed ext_spk_boost_reg\n",
 					__func__);
 			else
 				msleep_interruptible(20);
 		}
-		gpio_direction_output(ext_spk_amp_gpio, on);
+		if (gpio_is_valid(ext_spk_amp_gpio))
+			gpio_direction_output(ext_spk_amp_gpio, on);
 		/*time takes enable the external power amplifier*/
 		usleep_range(EXT_CLASS_D_EN_DELAY,
 			     EXT_CLASS_D_EN_DELAY + EXT_CLASS_D_DELAY_DELTA);
 	} else {
-		gpio_direction_output(ext_spk_amp_gpio, on);
+		if (gpio_is_valid(ext_spk_amp_gpio))
+			gpio_direction_output(ext_spk_amp_gpio, on);
 		/*time takes disable the external power amplifier*/
 		usleep_range(EXT_CLASS_D_DIS_DELAY + 2000,
 			     EXT_CLASS_D_DIS_DELAY + EXT_CLASS_D_DELAY_DELTA
 			     + 2000);
-		if (!IS_ERR(boost_reg)) {
+		if (!IS_ERR_OR_NULL(boost_reg)) {
 			if (regulator_disable(boost_reg))
 				pr_err("%s: disable failed ext_spk_boost_reg\n",
 					__func__);
@@ -353,7 +354,7 @@ static int msm_tx_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 }
 
 
-static const char *const btsco_rate_text[] = {"8000", "16000"};
+static const char *const btsco_rate_text[] = {"BTSCO_RATE_8KHZ", "BTSCO_RATE_16KHZ"};
 static const struct soc_enum msm_btsco_enum[] = {
 	SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
@@ -373,10 +374,10 @@ static int msm_btsco_rate_put(struct snd_kcontrol *kcontrol,
 			      struct snd_ctl_elem_value *ucontrol)
 {
 	switch (ucontrol->value.integer.value[0]) {
-	case 8000:
+	case 0:
 		msm_btsco_rate = BTSCO_RATE_8KHZ;
 		break;
-	case 16000:
+	case 1:
 		msm_btsco_rate = BTSCO_RATE_16KHZ;
 		break;
 	default:
@@ -1219,8 +1220,8 @@ static __devinit int msm8x10_asoc_machine_probe(struct platform_device *pdev)
 
 	if (of_parse_phandle(pdev->dev.of_node, "boost-supply", 0)) {
 		boost_reg = devm_regulator_get(&pdev->dev, "boost");
-		ret = IS_ERR(boost_reg);
-		if (ret) {
+		if (IS_ERR(boost_reg)) {
+			ret = PTR_ERR(boost_reg);
 			dev_err(&pdev->dev, "boost's regulator get error %d\n",
 				ret);
 			goto err1;

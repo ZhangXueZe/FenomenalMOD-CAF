@@ -101,7 +101,7 @@ static inline void defer_compaction(struct zone *zone, int order)
 static inline bool compaction_deferred(struct zone *zone, int order)
 {
 	return 1;
-}zz
+}
 
 #endif /* CONFIG_COMPACTION */
 

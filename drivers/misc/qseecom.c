@@ -1309,11 +1309,6 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 	struct qseecom_client_send_data_ireq send_data_req;
 	struct qseecom_command_scm_resp resp;
 
-	if (!data || !data->client.ihandle) {
-		pr_err("Client or client handle is not initialized\n");
-		return -EINVAL;
-	}
-
 	if (req->cmd_req_buf == NULL || req->resp_buf == NULL) {
 		pr_err("cmd buffer or response buffer is null\n");
 		return -EINVAL;
@@ -4299,7 +4294,8 @@ static int qseecom_suspend(struct platform_device *pdev, pm_message_t state)
 	mutex_lock(&qsee_bw_mutex);
 	mutex_lock(&clk_access_lock);
 
-	if (qseecom.current_mode != INACTIVE) {
+	if (qseecom.cumulative_mode != INACTIVE &&
+		qseecom.current_mode != INACTIVE) {
 		ret = msm_bus_scale_client_update_request(
 			qseecom.qsee_perf_client, INACTIVE);
 		if (ret)

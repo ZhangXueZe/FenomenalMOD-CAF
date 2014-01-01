@@ -21,7 +21,6 @@
 			cell-index = <0>;
 			compatible = "qcom,mdss-fb";
 			qcom,memblock-reserve = <0x3200000 0x400000>;
-			qcom,mdss-fb-splash-logo-enabled;
 		};
 	};
 

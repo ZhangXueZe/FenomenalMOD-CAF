@@ -54,8 +54,8 @@
 #include "mdss_fb.h"
 #include "mdss_mdp.h"
 
-#ifdef CONFIG_FB_MSM_QTR_BUFFER
-#define MDSS_FB_NUM 4
+#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
+#define MDSS_FB_NUM 3
 #else
 #define MDSS_FB_NUM 2
 #endif
@@ -1052,6 +1052,13 @@ int mdss_fb_blank_sub(int blank_mode, struct fb_info *info, int op_enable)
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = false;
 			mfd->bl_updated = 0;
+
+			if (mfd->shutdown_pending &&
+			    mfd->panel_info->bl_shutdown_delay)
+				usleep_range(mfd->panel_info->bl_shutdown_delay
+				       * 1000,
+				       mfd->panel_info->bl_shutdown_delay
+				       * 1000);
 
 			ret = mfd->mdp.off_fnc(mfd);
 			if (ret)
@@ -2130,14 +2137,9 @@ static int __mdss_fb_display_thread(void *data)
 				mfd->index);
 
 	while (1) {
-		ret = wait_event_interruptible(mfd->commit_wait_q,
+		wait_event(mfd->commit_wait_q,
 				(atomic_read(&mfd->commits_pending) ||
 				 kthread_should_stop()));
-
-		if (ret) {
-			pr_info("%s: interrupted", __func__);
-			continue;
-		}
 
 		if (kthread_should_stop())
 			break;
@@ -2318,8 +2320,8 @@ static int mdss_fb_set_par(struct fb_info *info)
 	else
 		mfd->fbi->fix.line_length = var->xres * var->bits_per_pixel / 8;
 
-	mfd->fbi->fix.smem_len = PAGE_ALIGN(mfd->fbi->fix.line_length *
-					mfd->fbi->var.yres) * mfd->fb_page;
+	mfd->fbi->fix.smem_len = mfd->fbi->fix.line_length *
+					mfd->fbi->var.yres_virtual;
 
 	if (mfd->panel_reconfig || (mfd->fb_imgType != old_imgType)) {
 		mdss_fb_blank_sub(FB_BLANK_POWERDOWN, info, mfd->op_enable);

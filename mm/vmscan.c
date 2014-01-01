@@ -132,7 +132,7 @@ struct mem_cgroup_zone {
 /*
  * From 0 .. 100.  Higher means more swappy.
  */
-int vm_swappiness = 10;
+int vm_swappiness = 60;
 long vm_total_pages;	/* The total number of pages which the VM controls */
 
 static LIST_HEAD(shrinker_list);
@@ -474,18 +474,8 @@ static pageout_t pageout(struct page *page, struct address_space *mapping,
 		if (!PageWriteback(page)) {
 			/* synchronous write or broken a_ops? */
 			ClearPageReclaim(page);
-			if (PageError(page) && PageSwapCache(page)) {
-				ClearPageError(page);
-				/*
-				 * We lock the page here because it is required
-				 * to free the swp space later in
-				 * shrink_page_list. But the page may be
-				 * unclocked by functions like
-				 * handle_write_error.
-				 */
-				__set_page_locked(page);
+			if (PageError(page))
 				return PAGE_ACTIVATE;
-			}
 		}
 		trace_mm_vmscan_writepage(page, trace_reclaim_flags(page));
 		inc_zone_page_state(page, NR_VMSCAN_WRITE);

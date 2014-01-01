@@ -909,7 +909,7 @@ int q6asm_audio_client_buf_alloc(unsigned int dir,
 	int cnt = 0;
 	int rc = 0;
 	struct audio_buffer *buf;
-	size_t len;
+	int len;
 
 	if (!(ac) || ((dir != IN) && (dir != OUT)))
 		return -EINVAL;
@@ -987,7 +987,7 @@ int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir,
 	int cnt = 0;
 	int rc = 0;
 	struct audio_buffer *buf;
-	size_t len;
+	int len;
 	int bytes_to_alloc;
 
 	if (!(ac) || ((dir != IN) && (dir != OUT)))
@@ -1022,7 +1022,7 @@ int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir,
 
 	rc = msm_audio_ion_alloc("audio_client", &buf[0].client, &buf[0].handle,
 		bytes_to_alloc,
-		(ion_phys_addr_t *)&buf[0].phys, &len,
+		(ion_phys_addr_t *)&buf[0].phys, (size_t *)&len,
 		&buf[0].data);
 	if (rc) {
 		pr_err("%s: Audio ION alloc is failed, rc = %d\n",

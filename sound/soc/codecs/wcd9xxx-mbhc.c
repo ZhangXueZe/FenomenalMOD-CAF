@@ -461,7 +461,7 @@ void *wcd9xxx_mbhc_cal_btn_det_mp(
 			    const struct wcd9xxx_mbhc_btn_detect_cfg *btn_det,
 			    const enum wcd9xxx_mbhc_btn_det_mem mem)
 {
-	void const *ret = &btn_det->_v_btn_low;
+	void *ret = &btn_det->_v_btn_low;
 
 	switch (mem) {
 	case MBHC_BTN_DET_GAIN:
@@ -479,7 +479,7 @@ void *wcd9xxx_mbhc_cal_btn_det_mp(
 		ret = NULL;
 	}
 
-	return (void *)ret;
+	return ret;
 }
 EXPORT_SYMBOL(wcd9xxx_mbhc_cal_btn_det_mp);
 

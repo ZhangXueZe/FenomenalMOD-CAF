@@ -24,6 +24,9 @@
 #include <linux/dropbox.h>
 #include <linux/uaccess.h>
 #include <linux/msm_mdp.h>
+#include <linux/jiffies.h>
+#include <linux/ktime.h>
+
 
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
@@ -32,10 +35,6 @@
 #include "mdss_dsi.h"
 #include "mdss_fb.h"
 #include "dsi_v2.h"
-
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
 
 #define DT_CMD_HDR 6
 #define DROPBOX_DISPLAY_ISSUE "display_issue"
@@ -63,6 +62,42 @@
 #define PWR_MODE_DISON 0x4
 
 DEFINE_LED_TRIGGER(bl_led_trigger);
+
+
+static DECLARE_COMPLETION(bl_on_delay_completion);
+static enum hrtimer_restart mdss_dsi_panel_bl_on_defer_timer_expire(
+			   struct hrtimer *timer)
+{
+	complete_all(&bl_on_delay_completion);
+	return HRTIMER_NORESTART;
+}
+
+static void mdss_dsi_panel_bl_on_defer_start(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	ktime_t delay_time;
+	struct mdss_panel_info *pinfo;
+
+	pinfo = &(ctrl->panel_data.panel_info);
+	if (pinfo->bl_on_defer_delay) {
+		delay_time = ktime_set(0, pinfo->bl_on_defer_delay * 1000000);
+		hrtimer_cancel(&pinfo->bl_on_defer_hrtimer);
+		INIT_COMPLETION(bl_on_delay_completion);
+		hrtimer_start(&pinfo->bl_on_defer_hrtimer,
+				delay_time,
+				HRTIMER_MODE_REL);
+	}
+}
+
+static void mdss_dsi_panel_bl_on_defer_wait(struct mdss_dsi_ctrl_pdata *ctrl)
+{
+	struct mdss_panel_info *pinfo;
+	pinfo = &(ctrl->panel_data.panel_info);
+	if (pinfo->bl_on_defer_delay &&
+	   !pinfo->cont_splash_enabled) {
+		wait_for_completion_timeout(&bl_on_delay_completion,
+				msecs_to_jiffies(pinfo->bl_on_defer_delay) + 1);
+	}
+}
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -327,10 +362,6 @@ static int mdss_dsi_panel_partial_update(struct mdss_panel_data *pdata)
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
 	}
-	
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
-#endif
 
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
@@ -388,6 +419,8 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
+
+	mdss_dsi_panel_bl_on_defer_wait(ctrl_pdata);
 
 	switch (ctrl_pdata->bklt_ctrl) {
 	case BL_WLED:
@@ -655,6 +688,8 @@ static int mdss_dsi_panel_cont_splash_on(struct mdss_panel_data *pdata)
 
 	mmi_panel_notify(MMI_PANEL_EVENT_DISPLAY_ON, NULL);
 
+	pdata->panel_info.cont_splash_esd_rdy = true;
+
 #ifndef CONFIG_FB_MSM_MDSS_MDP3
 	if (pdata->panel_info.hs_cmds_post_init)
 		mdss_set_tx_power_mode(DSI_MODE_BIT_HS, pdata);
@@ -817,6 +852,8 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	if (!mfd->quickdraw_in_progress)
 		mmi_panel_notify(MMI_PANEL_EVENT_DISPLAY_ON, NULL);
 
+	pdata->panel_info.cont_splash_esd_rdy = true;
+
 	mdss_dsi_get_pwr_mode(pdata, &pwr_mode);
 	/* validate screen is actually on */
 	if ((pwr_mode & 0x04) != 0x04) {
@@ -912,11 +949,6 @@ disable_regs:
 	pr_info("%s-:\n", __func__);
 
 	return 0;
-	
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
-#endif
-
 }
 
 static void mdss_dsi_parse_lane_swap(struct device_node *np, char *dlane_swap)
@@ -1720,6 +1752,18 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	pinfo->bl_max = (!rc ? tmp : 255);
 	ctrl_pdata->bklt_max = pinfo->bl_max;
 
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-bl-shutdown-delay", &tmp);
+	pinfo->bl_shutdown_delay = (!rc ? tmp : 0);
+
+	rc = of_property_read_u32(np, "qcom,mdss-dsi-bl-on-defer-delay", &tmp);
+	pinfo->bl_on_defer_delay = (!rc ? tmp : 0);
+	if (pinfo->bl_on_defer_delay) {
+		hrtimer_init(&pinfo->bl_on_defer_hrtimer,
+				CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		pinfo->bl_on_defer_hrtimer.function =
+			&mdss_dsi_panel_bl_on_defer_timer_expire;
+	}
+
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-interleave-mode", &tmp);
 	pinfo->mipi.interleave_mode = (!rc ? tmp : 0);
 
@@ -2126,6 +2170,8 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->check_status = mdss_panel_check_status;
 	ctrl_pdata->set_hbm = mdss_dsi_panel_set_hbm;
 	ctrl_pdata->set_cabc = mdss_dsi_panel_set_cabc;
+	ctrl_pdata->bl_on_defer = mdss_dsi_panel_bl_on_defer_start;
+
 
 	return 0;
 }

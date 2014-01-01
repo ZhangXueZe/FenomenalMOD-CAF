@@ -37,7 +37,7 @@ spinlock_t rq_lock;
 static DEFINE_PER_CPU(struct tick_sched, tick_cpu_sched);
 
 /*
- * The time, when the last jiffy update happened. Protected by jiffies_lock.
+ * The time, when the last jiffy update happened. Protected by xtime_lock.
  */
 static ktime_t last_jiffies_update;
 
@@ -55,14 +55,14 @@ static void tick_do_update_jiffies64(ktime_t now)
 	ktime_t delta;
 
 	/*
-	 * Do a quick check without holding jiffies_lock:
+	 * Do a quick check without holding xtime_lock:
 	 */
 	delta = ktime_sub(now, last_jiffies_update);
 	if (delta.tv64 < tick_period.tv64)
 		return;
 
-	/* Reevalute with jiffies_lock held */
-	write_seqlock(&jiffies_lock);
+	/* Reevalute with xtime_lock held */
+	write_seqlock(&xtime_lock);
 
 	delta = ktime_sub(now, last_jiffies_update);
 	if (delta.tv64 >= tick_period.tv64) {
@@ -85,7 +85,7 @@ static void tick_do_update_jiffies64(ktime_t now)
 		/* Keep the tick_next_period variable up to date */
 		tick_next_period = ktime_add(last_jiffies_update, tick_period);
 	}
-	write_sequnlock(&jiffies_lock);
+	write_sequnlock(&xtime_lock);
 }
 
 /*
@@ -95,12 +95,12 @@ static ktime_t tick_init_jiffy_update(void)
 {
 	ktime_t period;
 
-	write_seqlock(&jiffies_lock);
+	write_seqlock(&xtime_lock);
 	/* Did we start the jiffies update yet ? */
 	if (last_jiffies_update.tv64 == 0)
 		last_jiffies_update = tick_next_period;
 	period = last_jiffies_update;
-	write_sequnlock(&jiffies_lock);
+	write_sequnlock(&xtime_lock);
 	return period;
 }
 
@@ -303,10 +303,8 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 			tick_do_timer_cpu = TICK_DO_TIMER_NONE;
 	}
 
-	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE)) {
-		ts->sleep_length = (ktime_t) { .tv64 = NSEC_PER_SEC/HZ };
+	if (unlikely(ts->nohz_mode == NOHZ_MODE_INACTIVE))
 		return;
-	}
 
 	if (need_resched())
 		return;
@@ -314,8 +312,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
 		static int ratelimit;
 
-		if (ratelimit < 10 &&
-		(local_softirq_pending() & SOFTIRQ_STOP_IDLE_MASK)) {
+		if (ratelimit < 10) {
 			printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
 			       (unsigned int) local_softirq_pending());
 			ratelimit++;
@@ -326,11 +323,11 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 	ts->idle_calls++;
 	/* Read jiffies and the time when jiffies were updated last */
 	do {
-		seq = read_seqbegin(&jiffies_lock);
+		seq = read_seqbegin(&xtime_lock);
 		last_update = last_jiffies_update;
 		last_jiffies = jiffies;
 		time_delta = timekeeping_max_deferment();
-	} while (read_seqretry(&jiffies_lock, seq));
+	} while (read_seqretry(&xtime_lock, seq));
 
 	if (rcu_needs_cpu(cpu, &rcu_delta_jiffies) || printk_needs_cpu(cpu) ||
 	    arch_needs_cpu(cpu)) {
@@ -456,7 +453,6 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 out:
 	ts->next_jiffies = next_jiffies;
 	ts->last_jiffies = last_jiffies;
-	ts->sleep_length = ktime_sub(dev->next_event, now);
 }
 
 /**
@@ -530,8 +526,8 @@ void tick_nohz_irq_exit(void)
 ktime_t tick_nohz_get_sleep_length(void)
 {
 	struct tick_sched *ts = &__get_cpu_var(tick_cpu_sched);
-
-	return ts->sleep_length;
+	struct clock_event_device *dev = __get_cpu_var(tick_cpu_device).evtdev;
+	return ktime_sub(dev->next_event, ts->idle_entrytime);
 }
 
 static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
@@ -648,7 +644,7 @@ static void tick_nohz_handler(struct clock_event_device *dev)
 	 * concurrency: This happens only when the cpu in charge went
 	 * into a long sleep. If two cpus happen to assign themself to
 	 * this duty, then the jiffies update is still serialized by
-	 * jiffies_lock.
+	 * xtime_lock.
 	 */
 	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
 		tick_do_timer_cpu = cpu;
@@ -844,7 +840,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	 * concurrency: This happens only when the cpu in charge went
 	 * into a long sleep. If two cpus happen to assign themself to
 	 * this duty, then the jiffies update is still serialized by
-	 * jiffies_lock.
+	 * xtime_lock.
 	 */
 	if (unlikely(tick_do_timer_cpu == TICK_DO_TIMER_NONE))
 		tick_do_timer_cpu = cpu;
@@ -937,7 +933,10 @@ void tick_cancel_sched_timer(int cpu)
 		hrtimer_cancel(&ts->sched_timer);
 # endif
 
-	memset(ts, 0, sizeof(*ts));
+	ts->nohz_mode = NOHZ_MODE_INACTIVE;
+	ts->inidle = 0;
+	ts->tick_stopped = 0;
+	ts->idle_active = 0;
 }
 #endif
 

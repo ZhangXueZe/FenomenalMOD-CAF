@@ -382,7 +382,7 @@ group_add_out:
 		if (err)
 			return err;
 
-		err = mnt_want_write_file(filp);
+		err = mnt_want_write(filp->f_path.mnt);
 		if (err)
 			goto resizefs_out;
 
@@ -394,7 +394,7 @@ group_add_out:
 		}
 		if (err == 0)
 			err = err2;
-		mnt_drop_write_file(filp);
+		mnt_drop_write(filp->f_path.mnt);
 resizefs_out:
 		ext4_resize_end(sb);
 		return err;

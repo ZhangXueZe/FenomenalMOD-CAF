@@ -1747,8 +1747,8 @@ static int ext4_add_nondir(handle_t *handle,
 	int err = ext4_add_entry(handle, dentry, inode);
 	if (!err) {
 		ext4_mark_inode_dirty(handle, inode);
-		unlock_new_inode(inode);
 		d_instantiate(dentry, inode);
+		unlock_new_inode(inode);
 		return 0;
 	}
 	drop_nlink(inode);
@@ -1908,8 +1908,8 @@ out_clear_inode:
 	err = ext4_mark_inode_dirty(handle, dir);
 	if (err)
 		goto out_clear_inode;
-	unlock_new_inode(inode);
 	d_instantiate(dentry, inode);
+	unlock_new_inode(inode);
 out_stop:
 	brelse(dir_block);
 	ext4_journal_stop(handle);
@@ -2621,19 +2621,23 @@ const struct inode_operations ext4_dir_inode_operations = {
 	.mknod		= ext4_mknod,
 	.rename		= ext4_rename,
 	.setattr	= ext4_setattr,
+#ifdef CONFIG_EXT4_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
 	.listxattr	= ext4_listxattr,
 	.removexattr	= generic_removexattr,
+#endif
 	.get_acl	= ext4_get_acl,
 	.fiemap         = ext4_fiemap,
 };
 
 const struct inode_operations ext4_special_inode_operations = {
 	.setattr	= ext4_setattr,
+#ifdef CONFIG_EXT4_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
 	.listxattr	= ext4_listxattr,
 	.removexattr	= generic_removexattr,
+#endif
 	.get_acl	= ext4_get_acl,
 };

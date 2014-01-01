@@ -2641,7 +2641,7 @@ EXPORT_SYMBOL(kmem_cache_free);
  * take the list_lock.
  */
 static int slub_min_order;
-static int slub_max_order;
+static int slub_max_order = PAGE_ALLOC_COSTLY_ORDER;
 static int slub_min_objects;
 
 /*
@@ -4498,7 +4498,7 @@ static ssize_t show_slab_objects(struct kmem_cache *s,
 {
 	unsigned long total = 0;
 	int node;
-	int x = 0;
+	int x=0;
 	unsigned long *nodes;
 	unsigned long *per_cpu;
 

@@ -592,6 +592,7 @@ struct stm401_data {
 
 	dev_t stm401_dev_num;
 	struct class *stm401_class;
+	struct device *stm401_class_dev;
 	struct cdev as_cdev;
 	struct cdev ms_cdev;
 
@@ -652,6 +653,8 @@ struct stm401_algo_requst_t {
 	char data[ALGO_RQST_DATA_SIZE];
 };
 
+int64_t stm401_timestamp_ns(void);
+
 irqreturn_t stm401_isr(int irq, void *dev);
 void stm401_irq_work_func(struct work_struct *work);
 
@@ -699,7 +702,7 @@ int stm401_irq_wake_work_func_display_locked(struct stm401_data *ps_stm401,
 unsigned short stm401_get_interrupt_status(struct stm401_data *ps_stm401,
 	unsigned char reg, int *err);
 void stm401_quickpeek_work_func(struct work_struct *work);
-void stm401_quickpeek_reset_locked(struct stm401_data *ps_stm401);
+void stm401_quickpeek_reset_locked(struct stm401_data *ps_stm401, bool do_ack);
 int stm401_quickpeek_disable_when_idle(struct stm401_data *ps_stm401);
 void stm401_vote_aod_enabled_locked(struct stm401_data *ps_stm401, int voter,
 	bool enable);

@@ -817,7 +817,7 @@ int msm_cpu_pm_enter_sleep(enum msm_pm_sleep_mode mode, bool from_idle)
 
 int msm_pm_wait_cpu_shutdown(unsigned int cpu)
 {
-	int timeout = 0;
+	int timeout = 10;
 
 	if (!msm_pm_slp_sts)
 		return 0;
@@ -834,7 +834,7 @@ int msm_pm_wait_cpu_shutdown(unsigned int cpu)
 		if (acc_sts & msm_pm_slp_sts[cpu].mask)
 			return 0;
 		udelay(100);
-		WARN(++timeout == 50, "CPU%u didn't collapse in 5 ms\n", cpu);
+		WARN(++timeout == 20, "CPU%u didn't collapse in 2 ms\n", cpu);
 	}
 
 	return -EBUSY;

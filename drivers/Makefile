@@ -145,8 +145,3 @@ obj-$(CONFIG_CORESIGHT)		+= coresight/
 
 obj-$(CONFIG_BIF)		+= bif/
 obj-$(CONFIG_SENSORS)		+= sensors/
-
-#TRipnDroid core
-obj-y += tripndroid/
-
-obj-$(CONFIG_SUSPEND_BACKOFF)		+= backoff/

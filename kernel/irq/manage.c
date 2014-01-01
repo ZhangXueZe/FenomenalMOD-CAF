@@ -634,22 +634,6 @@ int __irq_set_trigger(struct irq_desc *desc, unsigned int irq,
 	return ret;
 }
 
-#ifdef CONFIG_HARDIRQS_SW_RESEND
-int irq_set_parent(int irq, int parent_irq)
-{
-	unsigned long flags;
-	struct irq_desc *desc = irq_get_desc_lock(irq, &flags, 0);
-
-	if (!desc)
-		return -EINVAL;
-
-	desc->parent_irq = parent_irq;
-
-	irq_put_desc_unlock(desc, flags);
-	return 0;
-}
-#endif
-
 /*
  * Default primary interrupt handler for threaded interrupts. Is
  * assigned as primary handler when request_threaded_irq is called
@@ -828,6 +812,9 @@ static void wake_threads_waitq(struct irq_desc *desc)
  */
 static int irq_thread(void *data)
 {
+	static const struct sched_param param = {
+		.sched_priority = MAX_USER_RT_PRIO/2,
+	};
 	struct irqaction *action = data;
 	struct irq_desc *desc = irq_to_desc(action->irq);
 	irqreturn_t (*handler_fn)(struct irq_desc *desc,
@@ -839,6 +826,7 @@ static int irq_thread(void *data)
 	else
 		handler_fn = irq_thread_fn;
 
+	sched_setscheduler(current, SCHED_FIFO, &param);
 	current->irq_thread = 1;
 
 	while (!irq_wait_for_interrupt(action)) {
@@ -965,9 +953,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 	 */
 	if (new->thread_fn && !nested) {
 		struct task_struct *t;
-		static const struct sched_param param = {
-			.sched_priority = MAX_USER_RT_PRIO/2,
-		};
 
 		t = kthread_create(irq_thread, new, "irq/%d-%s", irq,
 				   new->name);
@@ -975,9 +960,6 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			ret = PTR_ERR(t);
 			goto out_mput;
 		}
-
-		sched_setscheduler_nocheck(t, SCHED_FIFO, &param);
-
 		/*
 		 * We keep the reference to the task struct even if
 		 * the thread dies to avoid that the interrupt code

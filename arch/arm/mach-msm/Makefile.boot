@@ -89,6 +89,7 @@ dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-victara-p2a.dtb
 dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-victara-p2b.dtb
 dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-victara-p2bf.dtb
 dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-victara_cn-p1a.dtb
+dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-victara_cn-p3.dtb
 dtb-$(CONFIG_ARCH_MSM8974)	+= msm8974pro-ac-orthos-p1.dtb
 
 # APQ8084
@@ -227,6 +228,7 @@ dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2b.dtb
 dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2b1.dtb
 dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p1.dtb
 dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2.dtb
+dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2b.dtb
 
 # MSMSAMARIUM
    zreladdr-$(CONFIG_ARCH_MSMSAMARIUM)	:= 0x00008000

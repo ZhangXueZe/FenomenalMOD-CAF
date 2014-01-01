@@ -1134,7 +1134,7 @@ static int ext4_ext_grow_indepth(handle_t *handle, struct inode *inode,
 		  le32_to_cpu(EXT_FIRST_INDEX(neh)->ei_block),
 		  ext4_idx_pblock(EXT_FIRST_INDEX(neh)));
 
-	le16_add_cpu(&neh->eh_depth, 1);
+	neh->eh_depth = cpu_to_le16(le16_to_cpu(neh->eh_depth) + 1);
 	ext4_mark_inode_dirty(handle, inode);
 out:
 	brelse(bh);
@@ -2245,7 +2245,7 @@ static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
 	unsigned short ee_len =  ext4_ext_get_actual_len(ex);
 	ext4_fsblk_t pblk;
-	int flags = 0;
+	int flags = EXT4_FREE_BLOCKS_FORGET;
 
 	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
 		flags |= EXT4_FREE_BLOCKS_METADATA;
@@ -2729,9 +2729,7 @@ cont:
 		int flags = EXT4_FREE_BLOCKS_FORGET;
 
 		if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
-			flags |= EXT4_FREE_BLOCKS_METADATA | EXT4_FREE_BLOCKS_FORGET;
-	else if (ext4_should_journal_data(inode))
-		flags |= EXT4_FREE_BLOCKS_FORGET;
+			flags |= EXT4_FREE_BLOCKS_METADATA;
 
 		ext4_free_blocks(handle, inode, NULL,
 				 EXT4_C2B(EXT4_SB(sb), partial_cluster),

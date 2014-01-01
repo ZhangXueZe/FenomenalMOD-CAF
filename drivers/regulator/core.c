@@ -1719,9 +1719,8 @@ int regulator_disable_deferred(struct regulator *regulator, int ms)
 	rdev->deferred_disables++;
 	mutex_unlock(&rdev->mutex);
 
-	ret = queue_delayed_work(system_power_efficient_wq,
-				 &rdev->disable_work,
-				 msecs_to_jiffies(ms));
+	ret = schedule_delayed_work(&rdev->disable_work,
+				    msecs_to_jiffies(ms));
 	if (ret < 0)
 		return ret;
 	else
@@ -2536,7 +2535,7 @@ static void regulator_bulk_enable_async(void *data, async_cookie_t cookie)
 int regulator_bulk_enable(int num_consumers,
 			  struct regulator_bulk_data *consumers)
 {
-	ASYNC_DOMAIN_EXCLUSIVE(async_domain);
+	LIST_HEAD(async_domain);
 	int i;
 	int ret = 0;
 
@@ -3341,10 +3340,6 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
 
 	mutex_unlock(&regulator_list_mutex);
 	rdev_init_debugfs(rdev);
-#ifdef CONFIG_REGULATOR_PROXY_CONSUMER
-	rdev->proxy_consumer = regulator_proxy_consumer_register(dev,
-							of_node);
-#endif
 	return rdev;
 
 out:
@@ -3383,9 +3378,6 @@ void regulator_unregister(struct regulator_dev *rdev)
 
 	if (rdev->supply)
 		regulator_put(rdev->supply);
-#ifdef CONFIG_REGULATOR_PROXY_CONSUMER
-	regulator_proxy_consumer_unregister(rdev->proxy_consumer);
-#endif
 	mutex_lock(&regulator_list_mutex);
 	debugfs_remove_recursive(rdev->debugfs);
 	flush_work_sync(&rdev->disable_work.work);

@@ -200,11 +200,6 @@ devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler,
 					 devname, dev_id);
 }
 
-extern int __must_check
-devm_request_any_context_irq(struct device *dev, unsigned int irq,
-		 irq_handler_t handler, unsigned long irqflags,
-		 const char *devname, void *dev_id);
-
 extern void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
 
 /*
@@ -441,8 +436,6 @@ enum
 
 	NR_SOFTIRQS
 };
-
-#define SOFTIRQ_STOP_IDLE_MASK (~(1 << RCU_SOFTIRQ))
 
 /* map softirq index to softirq name. update 'softirq_to_name' in
  * kernel/softirq.c when adding a new softirq.
