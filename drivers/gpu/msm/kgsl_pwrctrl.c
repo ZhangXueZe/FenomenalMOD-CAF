@@ -45,13 +45,6 @@
 #define INIT_UDELAY		200
 #define MAX_UDELAY		2000
 
-/* Number of jiffies for a full thermal cycle */
-#define TH_HZ			20
-
-#ifdef CONFIG_CPU_FREQ_GOV_SLIM
-int graphics_boost = 6;
-#endif
-
 struct clk_pair {
 	const char *name;
 	uint map;
@@ -191,10 +184,6 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 
 	if (test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->power_flags) ||
 		(device->state == KGSL_STATE_NAP)) {
-
-#ifdef CONFIG_CPU_FREQ_GOV_SLIM
-        graphics_boost = pwr->active_pwrlevel;
-#endif
 
 		/*
 		 * On some platforms, instability is caused on
